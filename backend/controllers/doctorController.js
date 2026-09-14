@@ -3,8 +3,11 @@ import Doctor from '../models/Doctor.js';
 import MedicalHistory from '../models/MedicalHistory.js';
 import PatientReport from '../models/PatientReport.js';
 import Prescription from '../models/Prescription.js';
-import { checkInteractions } from '../services/drugInteraction.js';
 import { extractReadableSnippets, generatePatientSummary } from '../services/patientSummary.js';
+import {
+  calculateMedicationEndDate,
+  evaluatePrescriptionSafety
+} from '../services/prescriptionSafety.js';
 
 const normalizeTestName = (value = '') => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 const tokenize = (value = '') => value.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length >= 3);
@@ -231,31 +234,114 @@ export const requestTest = async (req, res) => {
 
 export const addPrescription = async (req, res) => {
   try {
-    const { medicines, notes } = req.body;
+    const { medicines, notes, override = false, overrideReason = '' } = req.body;
     const patientId = req.params.patientId;
-    const doctorId = (await Doctor.findOne({ doctorAuthId: req.user._id }))._id;
+    const doctor = await Doctor.findOne({ doctorAuthId: req.user._id });
+    const doctorId = doctor?._id;
 
-    // DRUG INTERACTION CHECK
-    const existingPrescriptions = await Prescription.find({ patientId });
-    const interactionWarnings = checkInteractions(medicines, existingPrescriptions);
+    if (!doctorId) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
 
-    // If there is an active conflict and the frontend didn't pass an "ignoreWarning" flag
-    if (interactionWarnings.length > 0 && !req.body.ignoreWarning) {
-      return res.status(400).json({ 
-        warning: true, 
-        message: 'Drug interaction detected', 
-        conflicts: interactionWarnings 
+    const [patient, existingPrescriptions] = await Promise.all([
+      Patient.findById(patientId),
+      Prescription.find({ patientId }).sort({ date: -1 })
+    ]);
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    const safetyReview = evaluatePrescriptionSafety({
+      patient,
+      newMedicines: medicines,
+      prescriptions: existingPrescriptions
+    });
+
+    if (safetyReview.alerts.length > 0 && !override) {
+      return res.status(400).json({
+        warning: true,
+        requiresOverride: true,
+        title: safetyReview.alerts.some((alert) => alert.severity === 'high')
+          ? 'Severe Allergy Risk'
+          : 'Possible Drug Interaction',
+        message: 'Prescription safety review detected clinical risks that require confirmation.',
+        alerts: safetyReview.alerts,
+        allergies: safetyReview.allergies,
+        ongoingMedications: safetyReview.ongoingMedications
       });
     }
+
+    const prescriptionDate = new Date();
+    const medicinesWithTimeline = (medicines || []).map((medicine) => ({
+      ...medicine,
+      frequency: medicine.frequency || 'As directed',
+      startDate: prescriptionDate,
+      endDate: calculateMedicationEndDate(medicine.duration, prescriptionDate)
+    }));
 
     const prescription = await Prescription.create({
       patientId,
       doctorId,
-      medicines,
-      notes
+      medicines: medicinesWithTimeline,
+      notes,
+      safetyReview: {
+        override: Boolean(override),
+        reason: overrideReason?.trim() || '',
+        checkedAt: prescriptionDate,
+        alerts: safetyReview.alerts
+      }
     });
 
+    patient.currentMedications = [
+      ...(patient.currentMedications || []).filter((item) => {
+        if (!item?.name) return false;
+        if (!item.endDate) return true;
+        return new Date(item.endDate) >= prescriptionDate;
+      }),
+      ...medicinesWithTimeline.map((medicine) => ({
+        name: medicine.name,
+        dosage: medicine.dosage,
+        frequency: medicine.frequency,
+        startDate: medicine.startDate,
+        endDate: medicine.endDate
+      }))
+    ];
+
+    await patient.save();
+
     res.status(201).json(prescription);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const checkPrescriptionSafety = async (req, res) => {
+  try {
+    const { medicines } = req.body;
+    const patientId = req.params.patientId;
+
+    const [patient, prescriptions] = await Promise.all([
+      Patient.findById(patientId),
+      Prescription.find({ patientId }).sort({ date: -1 })
+    ]);
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    const safetyReview = evaluatePrescriptionSafety({
+      patient,
+      newMedicines: medicines,
+      prescriptions
+    });
+
+    res.json({
+      ok: true,
+      alerts: safetyReview.alerts,
+      allergies: safetyReview.allergies,
+      ongoingMedications: safetyReview.ongoingMedications
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

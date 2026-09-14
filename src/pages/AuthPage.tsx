@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, type Role, getDefaultRoute } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { PwaInstallButton } from "@/components/app/PwaInstallButton";
 
 const roleCards = [
   { role: "patient" as const, title: "Patient", icon: UserRound, detail: "Access your dashboard, profile, history, and prescriptions." },
@@ -16,7 +17,6 @@ const roleCards = [
 const signupLinks = [
   { to: "/signup/patient", title: "Patient signup", icon: UserRound, detail: "Register your medical profile and health details." },
   { to: "/signup/doctor", title: "Doctor signup", icon: Stethoscope, detail: "Add your licence and clinical credentials." },
-  { to: "/signup/admin", title: "Admin signup", icon: UserRoundCog, detail: "Create a governance account with department info." },
 ];
 
 export default function AuthPage() {
@@ -63,16 +63,18 @@ export default function AuthPage() {
           </div>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight">Role-based access for patient care, clinical review, and audits</h1>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
-            This demo simulates a secure hospital-grade Smart EHR connected to a live API.
+            This simulates a secure hospital-grade Smart EHR connected to a live API.
             Doctors must scan a patient QR before chart access, patients cannot add prescriptions, and admins only review logs.
           </p>
 
+          <PwaInstallButton className="mt-6 rounded-2xl border-white/70 bg-background/70 dark:border-white/10" />
+
           <div className="mt-8 space-y-4">
             {[
-              "Single sign in / sign up page connected to MongoDB",
-              "Patient dashboard, profile, history, prescriptions, and health graphs",
-              "Live Doctor QR simulation and patient authorization",
-              "Admin audit trail tracking real API interactions",
+              "A secure, patient-controlled platform for managing and sharing medical records",
+              "Connect with doctors, book appointments, and access your health data anytime",
+              "Get intelligent insights with AI-powered summaries and health trends",
+              "Stay protected with privacy-first design and instant emergency support",
             ].map((item) => (
               <div key={item} className="rounded-[1.5rem] border border-white/70 bg-background/75 px-4 py-3 text-sm text-foreground dark:border-white/10">
                 {item}

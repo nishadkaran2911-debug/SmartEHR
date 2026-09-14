@@ -7,9 +7,15 @@ import {
   getPatientPrescriptions,
   getPatientSummary,
   addMedicalHistory, 
+  checkPrescriptionSafety,
   addPrescription,
   requestTest
 } from '../controllers/doctorController.js';
+import {
+  approveAppointment,
+  getDoctorAppointments,
+  rejectAppointment
+} from '../controllers/appointmentController.js';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { logAction } from '../middleware/auditMiddleware.js';
 
@@ -28,7 +34,11 @@ router.get('/patient/:patientId/prescriptions', logAction('VIEWED_PATIENT_PRESCR
 router.get('/patient/:patientId/summary', logAction('VIEWED_PATIENT_AI_SUMMARY'), getPatientSummary);
 
 router.post('/patient/:patientId/history', logAction('ADDED_MEDICAL_HISTORY'), addMedicalHistory);
+router.post('/patient/:patientId/prescription-safety-check', logAction('CHECKED_PRESCRIPTION_SAFETY'), checkPrescriptionSafety);
 router.post('/patient/:patientId/prescription', logAction('ADDED_PRESCRIPTION'), addPrescription);
 router.post('/patient/:patientId/request-test', logAction('REQUESTED_TEST'), requestTest);
+router.get('/appointments', logAction('VIEWED_DOCTOR_APPOINTMENTS'), getDoctorAppointments);
+router.patch('/appointments/:appointmentId/approve', logAction('APPROVED_APPOINTMENT'), approveAppointment);
+router.patch('/appointments/:appointmentId/reject', logAction('REJECTED_APPOINTMENT'), rejectAppointment);
 
 export default router;

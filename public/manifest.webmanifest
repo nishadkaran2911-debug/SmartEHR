@@ -1,0 +1,31 @@
+{
+  "name": "Smart EHR",
+  "short_name": "Smart EHR",
+  "id": "/",
+  "description": "Doctor and patient charts that stay accessible, secure, and ready for offline care review.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3fbfb",
+  "theme_color": "#0fa4af",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

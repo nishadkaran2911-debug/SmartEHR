@@ -10,6 +10,7 @@ import {
   getProfileModelByRole,
   getProfilePopulateFieldByRole
 } from '../utils/authModels.js';
+import { NpiVerificationError, verifyDoctorNpi } from '../services/npiVerificationService.js';
 
 const generateToken = (account) => {
   return jwt.sign({ id: account._id, role: account.role }, process.env.JWT_SECRET, {
@@ -51,7 +52,11 @@ const migrateLegacyProfileForLogin = async (legacyUser) => {
               contactNumber: legacyPatient.contactNumber || '',
               address: legacyPatient.address || '',
               majorIssues: legacyPatient.majorIssues || [],
+              allergies: legacyPatient.allergies || [],
+              currentMedications: legacyPatient.currentMedications || [],
               qrCode: legacyPatient.qrCode || `PAT-${legacyUser._id}-${Date.now()}`,
+              consentGiven: Boolean(legacyPatient.consentGiven),
+              consentTimestamp: legacyPatient.consentTimestamp || null,
               createdAt: legacyPatient.createdAt || new Date()
             },
             $unset: { userId: '' }
@@ -67,7 +72,11 @@ const migrateLegacyProfileForLogin = async (legacyUser) => {
           contactNumber: '',
           address: '',
           majorIssues: [],
-          qrCode: `PAT-${legacyUser._id}-${Date.now()}`
+          allergies: [],
+          currentMedications: [],
+          qrCode: `PAT-${legacyUser._id}-${Date.now()}`,
+          consentGiven: false,
+          consentTimestamp: null
         });
       }
     }
@@ -87,7 +96,11 @@ const migrateLegacyProfileForLogin = async (legacyUser) => {
               experience: legacyDoctor.experience || 0,
               hospitalName: legacyDoctor.hospitalName || '',
               contactNumber: legacyDoctor.contactNumber || '',
-              licenseNumber: legacyDoctor.licenseNumber || ''
+              licenseNumber: legacyDoctor.licenseNumber || '',
+              npiNumber: legacyDoctor.npiNumber || '',
+              isVerified: Boolean(legacyDoctor.isVerified),
+              registryName: legacyDoctor.registryName || '',
+              verificationSource: legacyDoctor.verificationSource || ''
             },
             $unset: { userId: '' }
           },
@@ -102,7 +115,11 @@ const migrateLegacyProfileForLogin = async (legacyUser) => {
           experience: 0,
           hospitalName: '',
           contactNumber: '',
-          licenseNumber: ''
+          licenseNumber: '',
+          npiNumber: '',
+          isVerified: false,
+          registryName: '',
+          verificationSource: ''
         });
       }
     }
@@ -126,6 +143,7 @@ const migrateLegacyProfileForLogin = async (legacyUser) => {
 };
 
 export const registerUser = async (req, res) => {
+  let createdUserId = null;
   try {
     const { name, email, password, role, ...roleData } = req.body;
     const authModel = getAuthModelByRole(role);
@@ -146,9 +164,15 @@ export const registerUser = async (req, res) => {
       email: normalizedEmail,
       password
     });
+    createdUserId = user?._id;
 
     if (user) {
       if (role === 'patient') {
+        if (!roleData.consentAccepted) {
+          await authModel.findByIdAndDelete(user._id);
+          return res.status(400).json({ message: 'Patient consent is required to create account' });
+        }
+
         const uniqueQr = `PAT-${user._id}-${Date.now()}`;
         await Patient.create({
           patientAuthId: user._id,
@@ -158,9 +182,29 @@ export const registerUser = async (req, res) => {
           contactNumber: roleData.contactNumber || '',
           address: roleData.address || '',
           majorIssues: roleData.majorIssues || [],
-          qrCode: uniqueQr
+          allergies: roleData.allergies || [],
+          currentMedications: roleData.currentMedications || [],
+          qrCode: uniqueQr,
+          consentGiven: true,
+          consentTimestamp: new Date()
         });
       } else if (role === 'doctor') {
+        let npiVerification;
+        try {
+          npiVerification = await verifyDoctorNpi({
+            npiNumber: roleData.npiNumber,
+            enteredName: name
+          });
+        } catch (verificationError) {
+          await authModel.findByIdAndDelete(user._id);
+
+          if (verificationError instanceof NpiVerificationError) {
+            const statusCode = verificationError.code === 'SERVICE_UNAVAILABLE' ? 503 : 400;
+            return res.status(statusCode).json({ message: verificationError.message });
+          }
+          return res.status(503).json({ message: 'Verification service unavailable, try again later' });
+        }
+
         await Doctor.create({
           doctorAuthId: user._id,
           age: roleData.age || 0,
@@ -169,7 +213,11 @@ export const registerUser = async (req, res) => {
           experience: roleData.experience || 0,
           hospitalName: roleData.hospitalName || '',
           contactNumber: roleData.contactNumber || '',
-          licenseNumber: roleData.licenseNumber || ''
+          licenseNumber: roleData.licenseNumber || '',
+          npiNumber: npiVerification.npiNumber,
+          isVerified: true,
+          registryName: npiVerification.registryName,
+          verificationSource: npiVerification.verificationSource
         });
       } else if (role === 'admin') {
         await Admin.create({
@@ -192,6 +240,12 @@ export const registerUser = async (req, res) => {
       res.status(400).json({ message: 'Invalid user data' });
     }
   } catch (error) {
+    if (createdUserId) {
+      await getAuthModelByRole(req.body.role)?.findByIdAndDelete(createdUserId);
+    }
+    if (error?.code === 11000 && error?.keyPattern?.npiNumber) {
+      return res.status(400).json({ message: 'NPI number is already registered' });
+    }
     res.status(500).json({ message: error.message });
   }
 };

@@ -1,4 +1,4 @@
-import { Menu, Moon, ShieldCheck, Sun } from "lucide-react";
+import { Menu, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,11 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-white/40 bg-background/75 backdrop-blur-xl dark:border-white/10 dark:bg-background/80">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
-          <div className="soft-surface flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-primary">
-            <ShieldCheck className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold tracking-[0.22em] text-primary/80">SMART EHR</div>
-            <div className="text-xs text-muted-foreground">Hospital-grade digital records</div>
-          </div>
+          <img
+            src="/finalNavbarLogo.png"
+            alt="Smart EHR"
+            className="h-12 w-40 object-contain object-left"
+          />
         </Link>
 
         <nav className="hidden items-center gap-2 md:flex">

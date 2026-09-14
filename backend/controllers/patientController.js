@@ -18,7 +18,9 @@ const buildDefaultPatientProfile = (patientAuthId) => ({
   contactNumber: '',
   address: '',
   majorIssues: [],
-  qrCode: `PAT-${patientAuthId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  qrCode: `PAT-${patientAuthId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  consentGiven: false,
+  consentTimestamp: null
 });
 
 const ensurePatientProfile = async (patientAuthId, populateUser = false) => {

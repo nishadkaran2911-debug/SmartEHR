@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart EHR - Offline</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at 20% 20%, #d6f8fb 0%, #effbfd 45%, #ffffff 100%);
+        color: #09393d;
+      }
+      .card {
+        width: min(560px, 92vw);
+        background: #ffffff;
+        border: 1px solid #d2edf0;
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: 0 12px 35px rgba(15, 164, 175, 0.14);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: #0b6a71;
+      }
+      p {
+        margin: 14px 0 0;
+        line-height: 1.6;
+        font-size: 0.96rem;
+      }
+      .hint {
+        margin-top: 16px;
+        font-size: 0.86rem;
+        color: #4d7275;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="card">
+      <h1>Smart EHR is offline</h1>
+      <p>
+        You are currently offline. Cached pages and previously synced patient data may still be available,
+        but live updates need an internet connection.
+      </p>
+      <p class="hint">Reconnect and refresh to resume full functionality.</p>
+    </section>
+  </body>
+</html>

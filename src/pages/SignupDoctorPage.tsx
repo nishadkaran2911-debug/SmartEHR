@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
 
 const doctorHighlights = [
   "Licence number is required to verify the doctor identity",
+  "NPI is checked against the official NPI Registry before account creation",
   "Professional details align with the doctor profile page and dashboard",
   "The form is ready for on-boarding new clinicians into the demo",
 ];
@@ -25,13 +27,24 @@ export default function SignupDoctorPage() {
   const [specialization, setSpecialization] = useState("");
   const [experience, setExperience] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
+  const [npiNumber, setNpiNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+    setVerificationMessage(null);
+
+    const normalizedNpi = npiNumber.trim();
+    if (!/^\d{10}$/.test(normalizedNpi)) {
+      setError("NPI Number must be exactly 10 digits.");
+      return;
+    }
+
     setLoading(true);
+    setVerificationMessage("Verifying NPI with registry...");
 
     try {
       await register({
@@ -45,12 +58,16 @@ export default function SignupDoctorPage() {
         specialization: specialization.trim(),
         experience: Number(experience) || 0,
         licenseNumber: licenseNumber.trim(),
+        npiNumber: normalizedNpi,
         hospitalName: "Smart EHR Hospital", // Default for demo
       });
 
+      setVerificationMessage("NPI verified successfully");
+      toast.success("NPI verified successfully");
       navigate("/doctor/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to create account.");
+      setVerificationMessage(null);
     } finally {
       setLoading(false);
     }
@@ -104,7 +121,30 @@ export default function SignupDoctorPage() {
             <Label htmlFor="doctor-license">Licence number</Label>
             <Input id="doctor-license" value={licenseNumber} onChange={(event) => setLicenseNumber(event.target.value)} placeholder="LIC-2026-001" className="h-12 rounded-2xl border-white/70 bg-background/70 dark:border-white/10" required />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="doctor-npi">NPI Number</Label>
+            <Input
+              id="doctor-npi"
+              value={npiNumber}
+              onChange={(event) => setNpiNumber(event.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="1234567890"
+              className="h-12 rounded-2xl border-white/70 bg-background/70 dark:border-white/10"
+              required
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              maxLength={10}
+            />
+          </div>
         </div>
+
+        {verificationMessage && (
+          <div className={`p-3 rounded-xl text-sm font-semibold border ${loading
+            ? "bg-primary/10 text-primary border-primary/20"
+            : "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-300"
+            }`}>
+            {verificationMessage}
+          </div>
+        )}
 
         {error && (
           <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm font-semibold border border-destructive/20">
@@ -113,7 +153,14 @@ export default function SignupDoctorPage() {
         )}
 
         <Button type="submit" disabled={loading} className="h-12 w-full rounded-2xl text-sm font-semibold">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Create doctor account"}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Verifying NPI...
+            </span>
+          ) : (
+            "Create doctor account"
+          )}
         </Button>
       </form>
     </SignupShell>

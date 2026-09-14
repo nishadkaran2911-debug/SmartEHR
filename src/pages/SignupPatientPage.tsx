@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { SignupShell } from "@/components/site/SignupShell";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,8 +27,11 @@ export default function SignupPatientPage() {
   const [password, setPassword] = useState("");
   const [address, setAddress] = useState("");
   const [majorHealthIssues, setMajorHealthIssues] = useState("");
+  const [allergies, setAllergies] = useState("");
+  const [currentMedications, setCurrentMedications] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
 
   const issuesPreview = useMemo(
     () =>
@@ -38,8 +42,40 @@ export default function SignupPatientPage() {
     [majorHealthIssues],
   );
 
+  const allergyPreview = useMemo(
+    () =>
+      allergies
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    [allergies],
+  );
+
+  const medicationPreview = useMemo(
+    () =>
+      currentMedications
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [name = "", dosage = "", frequency = "As directed"] = line.split("|").map((item) => item.trim());
+          return {
+            name,
+            dosage,
+            frequency: frequency || "As directed",
+          };
+        })
+        .filter((item) => item.name),
+    [currentMedications],
+  );
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setError(null);
+    setShowConsentDialog(true);
+  };
+
+  const handleConsentAndRegister = async () => {
     setError(null);
     setLoading(true);
 
@@ -55,8 +91,12 @@ export default function SignupPatientPage() {
         contactNumber: contact.trim(),
         address: address.trim(),
         majorIssues: issuesPreview,
+        allergies: allergyPreview,
+        currentMedications: medicationPreview,
+        consentAccepted: true,
       });
 
+      setShowConsentDialog(false);
       navigate("/patient/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to create account.");
@@ -121,6 +161,30 @@ export default function SignupPatientPage() {
           <p className="text-xs text-muted-foreground">Use commas to separate conditions. This will appear as the patient&apos;s tracked health issues.</p>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="patient-allergies">Drug allergies</Label>
+          <Textarea
+            id="patient-allergies"
+            value={allergies}
+            onChange={(event) => setAllergies(event.target.value)}
+            placeholder="Penicillin, Ibuprofen, Sulfa drugs"
+            className="min-h-24 rounded-2xl border-white/70 bg-background/70 dark:border-white/10"
+          />
+          <p className="text-xs text-muted-foreground">Use commas to separate allergies so doctors can be warned before prescribing.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="patient-current-meds">Current medications</Label>
+          <Textarea
+            id="patient-current-meds"
+            value={currentMedications}
+            onChange={(event) => setCurrentMedications(event.target.value)}
+            placeholder={"Metformin | 500 mg | Twice daily\nAspirin | 75 mg | Once daily"}
+            className="min-h-28 rounded-2xl border-white/70 bg-background/70 dark:border-white/10"
+          />
+          <p className="text-xs text-muted-foreground">Enter one medicine per line using Name | Dosage | Frequency.</p>
+        </div>
+
         <div className="rounded-[1.75rem] border border-white/70 bg-background/70 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Preview</p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -132,6 +196,29 @@ export default function SignupPatientPage() {
               ))
             ) : (
               <span className="text-sm text-muted-foreground">No health issues added yet.</span>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {allergyPreview.length ? (
+              allergyPreview.map((allergy) => (
+                <span key={allergy} className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-300">
+                  Allergy: {allergy}
+                </span>
+              ))
+            ) : (
+              <span className="text-sm text-muted-foreground">No allergies added yet.</span>
+            )}
+          </div>
+          <div className="mt-4 space-y-2">
+            {medicationPreview.length ? (
+              medicationPreview.map((item) => (
+                <div key={`${item.name}-${item.dosage}-${item.frequency}`} className="rounded-2xl bg-white/70 px-4 py-3 text-sm dark:bg-slate-900/50">
+                  <span className="font-medium">{item.name}</span>
+                  <span className="text-muted-foreground"> {item.dosage ? `| ${item.dosage}` : ""} | {item.frequency}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-sm text-muted-foreground">No current medications added yet.</span>
             )}
           </div>
         </div>
@@ -146,6 +233,41 @@ export default function SignupPatientPage() {
           {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Create patient account"}
         </Button>
       </form>
+
+      <Dialog open={showConsentDialog} onOpenChange={(open) => !loading && setShowConsentDialog(open)}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Patient Data Privacy & Consent</DialogTitle>
+            <DialogDescription>
+              Please review and accept before creating your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>Your medical data will be securely stored in this system.</p>
+            <p>Your data will only be shared with doctors when you provide access (QR or appointment).</p>
+            <p>Access to your data is temporary and controlled.</p>
+            <p>Doctors cannot download or misuse your data.</p>
+            <p>Your data is private and protected.</p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <Button onClick={handleConsentAndRegister} disabled={loading} className="rounded-2xl">
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating account...
+                </span>
+              ) : (
+                "I Agree and Continue"
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => setShowConsentDialog(false)} disabled={loading} className="rounded-2xl">
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SignupShell>
   );
 }

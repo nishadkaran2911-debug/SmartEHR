@@ -14,16 +14,19 @@ import FeaturesPage from "@/pages/FeaturesPage";
 import DoctorsPage from "@/pages/DoctorsPage";
 import PatientsPage from "@/pages/PatientsPage";
 import PatientDashboardPage from "@/pages/PatientDashboardPage";
+import PatientAppointmentsPage from "@/pages/PatientAppointmentsPage";
 import PatientProfilePage from "@/pages/PatientProfilePage";
 import PatientHistoryPage from "@/pages/PatientHistoryPage";
 import PatientPrescriptionsPage from "@/pages/PatientPrescriptionsPage";
 import PatientGraphsPage from "@/pages/PatientGraphsPage";
 import DoctorDashboardPage from "@/pages/DoctorDashboardPage";
+import DoctorAppointmentsPage from "@/pages/DoctorAppointmentsPage";
 import DoctorScanPage from "@/pages/DoctorScanPage";
 import DoctorPatientViewPage from "@/pages/DoctorPatientViewPage";
 import DoctorAddPrescriptionPage from "@/pages/DoctorAddPrescriptionPage";
 import DoctorProfilePage from "@/pages/DoctorProfilePage";
 import AdminDashboardPage from "@/pages/AdminDashboardPage";
+import AdminRoleActivityPage from "@/pages/AdminRoleActivityPage";
 import NotFound from "@/pages/NotFound";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -59,6 +62,7 @@ const App = () => {
               <Route path="profile" element={<PatientProfilePage />} />
               <Route path="history" element={<PatientHistoryPage />} />
               <Route path="prescriptions" element={<PatientPrescriptionsPage />} />
+              <Route path="appointments" element={<PatientAppointmentsPage />} />
               <Route path="graphs" element={<PatientGraphsPage />} />
             </Route>
 
@@ -72,6 +76,7 @@ const App = () => {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DoctorDashboardPage />} />
+              <Route path="appointments" element={<DoctorAppointmentsPage />} />
               <Route path="scan" element={<DoctorScanPage />} />
               <Route
                 path="patient-view"
@@ -102,6 +107,8 @@ const App = () => {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="doctor-activity" element={<AdminRoleActivityPage roleFilter="doctor" />} />
+              <Route path="patient-activity" element={<AdminRoleActivityPage roleFilter="patient" />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

@@ -8,8 +8,17 @@ const doctorSchema = new mongoose.Schema({
   experience: { type: Number, required: true, default: 0 }, // in years
   hospitalName: { type: String, required: true, default: '' },
   contactNumber: { type: String, required: true, default: '' },
-  licenseNumber: { type: String, required: true, default: '' }
+  licenseNumber: { type: String, required: true, default: '' },
+  npiNumber: { type: String, required: true, trim: true, default: '' },
+  isVerified: { type: Boolean, default: false },
+  registryName: { type: String, default: '' },
+  verificationSource: { type: String, default: '' }
 });
+
+doctorSchema.index(
+  { npiNumber: 1 },
+  { unique: true, partialFilterExpression: { npiNumber: { $type: 'string', $gt: '' } } }
+);
 
 doctorSchema.set('toJSON', {
   transform: (_doc, ret) => {

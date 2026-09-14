@@ -7,6 +7,10 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import {
+  PrescriptionSafetyDialog,
+  type PrescriptionSafetyAlert,
+} from "@/components/app/PrescriptionSafetyDialog";
 
 export default function DoctorAddPrescriptionPage() {
   const { doctorAccess } = useAuth();
@@ -19,9 +23,14 @@ export default function DoctorAddPrescriptionPage() {
   const [notes, setNotes] = useState("");
   const [savedFor, setSavedFor] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  
-  const [interaction, setInteraction] = useState({ tone: "", title: "", detail: "" });
-  const [duplicateTestWarning, setDuplicateTestWarning] = useState("");
+  const [safetyAlerts, setSafetyAlerts] = useState<PrescriptionSafetyAlert[]>([]);
+  const [safetyDialogOpen, setSafetyDialogOpen] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
+
+  const prescriptionPayload = {
+    medicines: [{ name: medicine, dosage, duration }],
+    notes: notes + (testName ? ` | Ordered test: ${testName}` : "")
+  };
 
   useEffect(() => {
     if (!doctorAccess.patientId) {
@@ -34,22 +43,24 @@ export default function DoctorAddPrescriptionPage() {
       .finally(() => setLoading(false));
   }, [doctorAccess.patientId]);
 
-  const savePrescription = async (ignoreWarning = false) => {
+  const persistPrescription = async (override = false) => {
     if (!doctorAccess.patientId || !medicine || !dosage || !duration) return;
-    
+
     setSubmitting(true);
-    setInteraction({ tone: "", title: "", detail: "" });
-    
+
     try {
       await apiFetch(`/doctors/patient/${doctorAccess.patientId}/prescription`, {
         method: 'POST',
         body: JSON.stringify({
-          medicines: [{ name: medicine, dosage, duration }],
-          notes: notes + (testName ? ` | Ordered test: ${testName}` : ""),
-          ignoreWarning
+          ...prescriptionPayload,
+          override,
+          overrideReason
         })
       });
 
+      setSafetyAlerts([]);
+      setSafetyDialogOpen(false);
+      setOverrideReason("");
       setSavedFor(patient?.userId?.name || "Patient");
       setMedicine("");
       setDosage("");
@@ -57,15 +68,48 @@ export default function DoctorAddPrescriptionPage() {
       setTestName("");
       setNotes("");
     } catch (err: any) {
-      if (err.status === 400 && err.data?.warning) {
-        setInteraction({
-          tone: "red",
-          title: "Drug Interaction Alert",
-          detail: err.data.conflicts?.map((c: any) => c.issue).join(" | ") || err.data.message
-        });
+      if (err.status === 400 && err.data?.requiresOverride && err.data?.alerts) {
+        setSafetyAlerts(err.data.alerts);
+        setSafetyDialogOpen(true);
       } else {
         alert(err.message || "Failed to save prescription");
       }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const runSafetyCheck = async () => {
+    if (!doctorAccess.patientId || !medicine || !dosage || !duration) return;
+
+    setSubmitting(true);
+    setSavedFor("");
+
+    try {
+      const response: any = await apiFetch(`/doctors/patient/${doctorAccess.patientId}/prescription-safety-check`, {
+        method: "POST",
+        body: JSON.stringify(prescriptionPayload)
+      });
+
+      if (response.alerts?.length) {
+        setSafetyAlerts(response.alerts);
+        setSafetyDialogOpen(true);
+        return;
+      }
+
+      await persistPrescription(false);
+    } catch (err: any) {
+      const routeUnavailable =
+        err.status === 404 ||
+        String(err.message || "").includes("Cannot POST /api/doctors/patient/") ||
+        String(err.data?.message || "").includes("Cannot POST /api/doctors/patient/");
+
+      if (routeUnavailable) {
+        await persistPrescription(false);
+        return;
+      }
+
+      alert(err.message || "Unable to run prescription safety check");
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +131,7 @@ export default function DoctorAddPrescriptionPage() {
       <section className="soft-surface rounded-[2rem] border border-white/60 bg-white/85 p-7 dark:border-white/12 dark:bg-slate-900/75">
         <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Add Prescription</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Create a prescription for {patient.userId?.name}</h1>
-        <form className="mt-8 space-y-5" onSubmit={(e) => { e.preventDefault(); savePrescription(); }}>
+        <form className="mt-8 space-y-5" onSubmit={(e) => { e.preventDefault(); void runSafetyCheck(); }}>
           <div className="space-y-2">
             <Label htmlFor="medicine">Medicine name</Label>
             <Input id="medicine" value={medicine} onChange={(event) => setMedicine(event.target.value)} placeholder="Metformin or Warfarin" className="h-12 rounded-2xl border-white/70 bg-background/70 dark:border-white/10" required />
@@ -108,11 +152,7 @@ export default function DoctorAddPrescriptionPage() {
             <Label htmlFor="notes">Clinical notes</Label>
             <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add brief encounter notes for this prescription..." className="rounded-2xl border-white/70 bg-background/70 dark:border-white/10" />
           </div>
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="rounded-2xl w-full h-12"
-          >
+          <Button type="submit" disabled={submitting} className="rounded-2xl w-full h-12">
             {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Prescription"}
           </Button>
           {savedFor && (
@@ -127,26 +167,21 @@ export default function DoctorAddPrescriptionPage() {
         <div
           className={cn(
             "soft-surface rounded-[2rem] border p-7 transition-all",
-            interaction.tone === "red" ? "border-red-200/70 bg-red-50/80 dark:border-red-500/20 dark:bg-red-500/10" : 
+            safetyAlerts.length > 0 ? "border-red-200/70 bg-red-50/80 dark:border-red-500/20 dark:bg-red-500/10" :
             "border-white/60 bg-white/85 dark:border-white/12 dark:bg-slate-900/75"
           )}
         >
-          <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Drug Interaction Alert</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Prescription Safety Checker</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            {interaction.title || "Real-time safety checks"}
+            {safetyAlerts.some((alert) => alert.severity === "high")
+              ? "Severe Allergy Risk detected"
+              : safetyAlerts.length > 0
+                ? "Possible Drug Interaction detected"
+                : "Real-time safety checks"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            {interaction.detail || "System will check for contraindications with the patient's existing medication history upon submission."}
+            {safetyAlerts[0]?.message || "System checks documented allergies and ongoing medications before anything is saved."}
           </p>
-          {interaction.tone === "red" && (
-            <Button 
-               variant="destructive" 
-               className="mt-4 rounded-xl"
-               onClick={() => savePrescription(true)}
-            >
-               Override and Save Anyway
-            </Button>
-          )}
         </div>
 
         <div className="soft-surface rounded-[2rem] border border-white/60 bg-white/85 p-7 dark:border-white/12 dark:bg-slate-900/75">
@@ -165,6 +200,15 @@ export default function DoctorAddPrescriptionPage() {
           </p>
         </div>
       </section>
+      <PrescriptionSafetyDialog
+        alerts={safetyAlerts}
+        open={safetyDialogOpen}
+        overrideReason={overrideReason}
+        saving={submitting}
+        onOverrideReasonChange={setOverrideReason}
+        onCancel={() => setSafetyDialogOpen(false)}
+        onProceed={() => void persistPrescription(true)}
+      />
     </div>
   );
 }

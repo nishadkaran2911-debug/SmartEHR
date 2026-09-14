@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Stethoscope, UserRound, UserRoundCog } from "lucide-react";
+import { ArrowRight, Stethoscope, UserRound } from "lucide-react";
 import { SignupShell } from "@/components/site/SignupShell";
 
 const signupOptions = [
@@ -15,12 +15,6 @@ const signupOptions = [
     icon: Stethoscope,
     description: "Register your licence, qualification, specialization, and professional contact details.",
   },
-  {
-    to: "/signup/admin",
-    title: "Admin signup",
-    icon: UserRoundCog,
-    description: "Create an admin profile with department and admin ID for audit and oversight access.",
-  },
 ];
 
 export default function SignupLandingPage() {
@@ -32,7 +26,6 @@ export default function SignupLandingPage() {
       highlights={[
         "Patients register profile details needed for medical records and dashboards",
         "Doctors register their licence and professional credentials",
-        "Admins register department details for audit and governance access",
       ]}
     >
       <div className="space-y-4">

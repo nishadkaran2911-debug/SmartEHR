@@ -7,10 +7,17 @@ import {
   type ReactNode,
 } from "react";
 import { apiFetch, getAuthToken, setAuthToken, removeAuthToken } from "@/lib/api";
+import {
+  clearAllCachedPatientCharts,
+  clearCachedSession,
+  isNetworkError,
+  readCachedSession,
+  saveCachedSession,
+} from "@/lib/offlineStore";
 
 export type Role = "patient" | "doctor" | "admin";
 
-type Session = {
+export type Session = {
   _id: string;
   name: string;
   role: Role;
@@ -47,7 +54,7 @@ function readAccess(): DoctorAccess {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(() => readCachedSession());
   const [doctorAccess, setDoctorAccess] = useState<DoctorAccess>(readAccess);
   const [loading, setLoading] = useState(true);
 
@@ -55,20 +62,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // on mount, if we have a token, fetch profile to restore session
     const restoreSession = async () => {
       if (!getAuthToken()) {
+        clearCachedSession();
         setLoading(false);
         return;
       }
 
+      const cachedSession = readCachedSession();
+
+      if (cachedSession) {
+        setSession(cachedSession);
+      }
+
       try {
         const data: any = await apiFetch("/auth/profile");
-        setSession({
+        const restoredSession = {
           _id: data._id,
           name: data.name,
           email: data.email,
           role: data.role as Role
-        });
+        };
+        setSession(restoredSession);
+        saveCachedSession(restoredSession);
       } catch (e) {
-        removeAuthToken();
+        if (!cachedSession || !isNetworkError(e)) {
+          removeAuthToken();
+          clearCachedSession();
+          clearAllCachedPatientCharts();
+          setSession(null);
+          setDoctorAccess({ granted: false, patientId: null });
+        }
       } finally {
         setLoading(false);
       }
@@ -91,7 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ email, password, role })
         });
         setAuthToken(data.token);
-        setSession({ _id: data._id, name: data.name, role: data.role as Role, email: data.email });
+        const nextSession = { _id: data._id, name: data.name, role: data.role as Role, email: data.email };
+        setSession(nextSession);
+        saveCachedSession(nextSession);
         setDoctorAccess({ granted: false, patientId: null });
       },
       register: async (payload) => {
@@ -100,11 +124,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(payload)
         });
         setAuthToken(data.token);
-        setSession({ _id: data._id, name: data.name, role: data.role as Role, email: data.email });
+        const nextSession = { _id: data._id, name: data.name, role: data.role as Role, email: data.email };
+        setSession(nextSession);
+        saveCachedSession(nextSession);
         setDoctorAccess({ granted: false, patientId: null });
       },
       logout: () => {
         removeAuthToken();
+        clearCachedSession();
+        clearAllCachedPatientCharts();
         setSession(null);
         setDoctorAccess({ granted: false, patientId: null });
       },

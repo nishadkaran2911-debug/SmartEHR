@@ -1,4 +1,5 @@
-export const API_URL = "http://localhost:5000/api";
+const envApiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+export const API_URL = envApiUrl || "http://localhost:5000/api";
 export const API_ROOT = API_URL.replace(/\/api$/, "");
 
 export const getAuthToken = () => localStorage.getItem("ehr_token");

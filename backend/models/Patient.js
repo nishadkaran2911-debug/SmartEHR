@@ -8,7 +8,19 @@ const patientSchema = new mongoose.Schema({
   contactNumber: { type: String, required: true, default: '' },
   address: { type: String, required: true, default: '' },
   majorIssues: [{ type: String }],
+  allergies: [{ type: String, trim: true }],
+  currentMedications: [
+    {
+      name: { type: String, required: true, trim: true },
+      dosage: { type: String, default: '', trim: true },
+      frequency: { type: String, default: 'As directed', trim: true },
+      startDate: { type: Date, default: Date.now },
+      endDate: { type: Date, default: null }
+    }
+  ],
   qrCode: { type: String, unique: true, required: true },
+  consentGiven: { type: Boolean, default: false },
+  consentTimestamp: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
 });
 
